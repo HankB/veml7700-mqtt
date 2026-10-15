@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+linux-embedded-hal = "0.5.0"
+veml7700 = { version = "0.3.2", features = ["lux_as_f32"] }
