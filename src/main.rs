@@ -9,17 +9,17 @@ fn main() {
 
     let mut sensor = Veml7700::new(i2c);
     
-    sensor.set_gain(Gain::One)
+    sensor.set_gain(Gain::Two)
         .expect("Failed to set VEML7700 gain");
     
-    sensor.set_integration_time(IntegrationTime::_100ms)
+    sensor.set_integration_time(IntegrationTime::_800ms)
         .expect("Failed to set VEML7700 integration time");
-        
+    
     sensor.enable()
         .expect("Failed to enable VEML7700");
 
     // Datasheet/driver requires at least 4 ms after enabling.
-    thread::sleep(Duration::from_millis(10));
+    thread::sleep(Duration::from_millis(850));
 
     loop {
         let lux = sensor.read_lux()
