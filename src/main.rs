@@ -1,7 +1,11 @@
 use hostname::get;
 use linux_embedded_hal::I2cdev;
-use rumqttc::{Client, MqttOptions, QoS};
+use rumqttc::{Client, Event, Incoming, MqttOptions, QoS};
 use serde::Serialize;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use veml7700::{Gain, IntegrationTime, Veml7700};
@@ -48,18 +52,47 @@ fn main() {
     let (client, mut connection) = Client::new(mqtt_options, 10);
 
     //
-    // The rumqttc connection event loop must continue running for
-    // MQTT traffic to be processed.
+    // Connection state is shared between the MQTT event-loop thread
+    // and the sensor/reporting thread.
+    //
+    let mqtt_connected = Arc::new(AtomicBool::new(false));
+    let connection_state = Arc::clone(&mqtt_connected);
+
+    //
+    // Drive the MQTT connection.
     //
     thread::spawn(move || {
         for notification in connection.iter() {
-            if let Err(error) = notification {
-                eprintln!(
-                    "MQTT connection error: {}. Retrying in {:?}",
-                    error,
-                    RETRY_DELAY
-                );
-                thread::sleep(RETRY_DELAY); // not 
+            match notification {
+                //
+                // CONNACK means the MQTT connection has been
+                // successfully established with the broker.
+                //
+                Ok(Event::Incoming(Incoming::ConnAck(_))) => {
+                    connection_state.store(true, Ordering::Relaxed);
+                    println!("MQTT connected");
+                }
+
+                //
+                // Other MQTT events don't affect our connection
+                // state.
+                //
+                Ok(_) => {}
+
+                //
+                // Any connection error marks MQTT unavailable.
+                //
+                Err(error) => {
+                    connection_state.store(false, Ordering::Relaxed);
+
+                    eprintln!(
+                        "MQTT connection error: {}. Retrying in {:?}",
+                        error,
+                        RETRY_DELAY
+                    );
+
+                    thread::sleep(RETRY_DELAY);
+                }
             }
         }
     });
@@ -82,12 +115,14 @@ fn main() {
         .expect("Failed to enable VEML7700");
 
     //
-    // The first reading was observed to be 0.0 with a shorter delay.
+    // A shorter delay was observed to produce an initial 0.0
+    // reading on the test hardware.
     //
     thread::sleep(SENSOR_STARTUP_DELAY);
 
     //
-    // Reporting state.
+    // Reporting state. These represent the last reading we actually
+    // submitted for publication while MQTT was connected.
     //
     let mut last_reported: Option<f32> = None;
     let mut last_report_time: Option<Instant> = None;
@@ -98,7 +133,7 @@ fn main() {
 
         let should_report = match last_reported {
             //
-            // Always report the first valid reading.
+            // Always report the first reading once MQTT is available.
             //
             None => true,
 
@@ -122,7 +157,14 @@ fn main() {
             }
         };
 
-        if should_report {
+        //
+        // Do not queue measurements while MQTT is disconnected.
+        //
+        // Because last_reported and last_report_time are not updated
+        // in that case, the current value will be eligible for
+        // publication as soon as MQTT reconnects.
+        //
+        if should_report && mqtt_connected.load(Ordering::Relaxed) {
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("System clock is before Unix epoch")
@@ -139,20 +181,26 @@ fn main() {
 
             println!("{} {}", topic, payload);
 
-            client.publish(
+            match client.publish(
                 &topic,
                 QoS::AtLeastOnce,
-                true, // retain the last message
+                true, // retain latest lighting state
                 payload,
-            )
-            .expect("Failed to publish MQTT message");
+            ) {
+                Ok(()) => {
+                    last_reported = Some(lux);
+                    last_report_time = Some(Instant::now());
+                }
 
-            //
-            // Change detection is relative to the value we most
-            // recently reported, not the previous sensor reading.
-            //
-            last_reported = Some(lux);
-            last_report_time = Some(Instant::now());
+                Err(error) => {
+                    //
+                    // Do not update reporting state. The current
+                    // reading has not even been accepted into the
+                    // MQTT request queue.
+                    //
+                    eprintln!("Failed to queue MQTT publish: {}", error);
+                }
+            }
         }
 
         thread::sleep(SAMPLE_INTERVAL);
