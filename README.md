@@ -14,6 +14,15 @@ cargo add veml7700 --features lux_as_f32
 cargo build --release
 ```
 
+When MQTT publishing is added:
+
+```text
+cargo add rumqttc
+cargo add serde --features derive
+cargo add serde_json
+cargo add hostname
+```
+
 ## Errata
 
 * Check for presence of the sensor using `i2cdetect -y 1` (and don't overlook the `10` in the second row, first column.)
