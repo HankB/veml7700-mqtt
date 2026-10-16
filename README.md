@@ -2,6 +2,10 @@
 
 Read the VEML7700 light sensor and publish using MQTT in Rust.
 
+## AI/LLM warning
+
+ChatGPT was heavily involved in development following instructions from me and writing most of the code.
+
 ## first build
 
 (Not including "Hello World")
