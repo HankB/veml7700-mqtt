@@ -15,7 +15,7 @@ const MQTT_PORT: u16 = 1883;
 
 const REPORT_CHANGE: f32 = 0.10; // 10%
 const MIN_CHANGE_LUX: f32 = 0.01;
-const MAX_REPORT_INTERVAL: Duration = Duration::from_secs(15);
+const MAX_REPORT_INTERVAL: Duration = Duration::from_secs(60);
 
 const SAMPLE_INTERVAL: Duration = Duration::from_secs(2);
 const SENSOR_STARTUP_DELAY: Duration = Duration::from_secs(2);
