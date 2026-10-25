@@ -27,6 +27,11 @@ cargo add serde_json
 cargo add hostname
 ```
 
+## References
+
+* <https://www.vishay.com/docs/84286/veml7700.pdf> data sheet
+* <https://www.vishay.com/docs/84323/designingveml7700.pdf> Designing the VEML7700 Into an Application
+
 ## Errata
 
 * Check for presence of the sensor using `i2cdetect -y 1` (and don't overlook the `10` in the second row, first column.)
