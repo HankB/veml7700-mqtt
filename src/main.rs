@@ -10,7 +10,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use veml7700::{Gain, IntegrationTime, Veml7700};
 
-const MQTT_HOST: &str = "pilog3b";
+const MQTT_HOST: &str = "mqtt";
 const MQTT_PORT: u16 = 1883;
 
 const REPORT_CHANGE: f32 = 0.10; // 10%
